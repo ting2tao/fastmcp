@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/D:\\workSpace\\python-wk\\fastmcp/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp\\src\\fastmcp/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp\\.cursor\\rules/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp\\src\\fastmcp\\server/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp/**)",
+      "Read(/D:\\workSpace\\python-wk\\fastmcp\\native_mcp/**)",
+      "Bash(python:*)",
+      "Bash(timeout:*)",
+      "Bash(npx:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
