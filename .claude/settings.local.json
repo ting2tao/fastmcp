@@ -17,7 +17,9 @@
       "Bash(taskkill:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(pip install:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

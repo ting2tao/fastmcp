@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
 """
-Native MCP Server Implementation with Streaming Support
+Simplified Kimi AI MCP Server - Demo Version
+Uses built-in libraries only for demonstration
 """
 import asyncio
 import inspect
+import json
+import os
 from typing import Any, Dict, List, Optional, Callable
 
 try:
@@ -21,8 +25,8 @@ except ImportError:
     )
 
 
-class MCPServer:
-    def __init__(self, name: str = "native-mcp-server", version: str = "1.0.0"):
+class SimplifiedKimiMCPServer:
+    def __init__(self, name: str = "kimi-mcp-server-demo", version: str = "1.0.0"):
         self.name = name
         self.version = version
         self.tools: Dict[str, Callable] = {}
@@ -31,6 +35,10 @@ class MCPServer:
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
         self.running = False
+        
+        # Kimi AI 配置 (演示模式)
+        self.kimi_api_key = os.getenv('KIMI_API_KEY', '')
+        self.demo_mode = not bool(self.kimi_api_key)
         
     def tool(self, name: Optional[str] = None, description: str = "", input_schema: Optional[Dict[str, Any]] = None):
         """Decorator to register a tool"""
@@ -103,49 +111,40 @@ class MCPServer:
             "properties": properties,
             "required": required
         }
-        
-    async def start_stdio(self):
-        """Start server using stdio transport"""
-        import sys
-        
-        self.reader = asyncio.StreamReader()
-        protocol = asyncio.StreamReaderProtocol(self.reader)
-        transport, _ = await asyncio.get_event_loop().connect_read_pipe(
-            lambda: protocol, sys.stdin
-        )
-        
-        self.writer = asyncio.StreamWriter(
-            transport=sys.stdout,
-            protocol=None,
-            reader=None,
-            loop=asyncio.get_event_loop()
-        )
-        
-        self.running = True
-        await self._message_loop()
-        
-    async def start_tcp(self, host: str = "localhost", port: int = 3000):
+    
+    async def start_tcp(self, host: str = "localhost", port: int = 3001):
         """Start server using TCP transport"""
+        print(f"[DEBUG] Starting TCP server on {host}:{port}...")
         server = await asyncio.start_server(
             self._handle_client, host, port
         )
         
-        print(f"MCP Server running on {host}:{port}")
+        print(f"Kimi MCP Server (Demo) running on {host}:{port}")
+        if self.demo_mode:
+            print(f"[DEMO] Demo mode: using mock Kimi AI responses")
+            print(f"[TIP] To use real API, set: export KIMI_API_KEY=your_key")
+        else:
+            print(f"[OK] Production mode: Kimi API Key configured")
         self.running = True
+        print(f"[DEBUG] Server is ready to accept connections")
         
         async with server:
             await server.serve_forever()
             
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """Handle a client connection"""
+        client_address = writer.get_extra_info('peername')
+        print(f"[DEBUG] New client connection from {client_address}")
+        
         self.reader = reader
         self.writer = writer
         
         try:
             await self._message_loop()
         except Exception as e:
-            print(f"Client error: {e}")
+            print(f"[ERROR] Client error: {e}")
         finally:
+            print(f"[DEBUG] Closing connection from {client_address}")
             writer.close()
             await writer.wait_closed()
             
@@ -237,7 +236,7 @@ class MCPServer:
         if not self.writer:
             return
             
-        message_str = MCPMessage.serialize(response) + "\n"
+        message_str = MCPMessage.serialize(response) + "\\n"
         self.writer.write(message_str.encode())
         await self.writer.drain()
         
@@ -247,7 +246,7 @@ class MCPServer:
             return
             
         notification = MCPNotification(method=method, params=params)
-        message_str = MCPMessage.serialize(notification) + "\n"
+        message_str = MCPMessage.serialize(notification) + "\\n"
         self.writer.write(message_str.encode())
         await self.writer.drain()
         
@@ -318,7 +317,7 @@ class MCPServer:
                 result = func(**arguments)
                 
             return {"content": [{"type": "text", "text": str(result)}]}
-            
+    
     async def _handle_resources_list(self) -> Dict[str, Any]:
         """Handle resources/list request"""
         resources = []
@@ -393,125 +392,146 @@ class MCPServer:
             await self.writer.wait_closed()
 
 
-# Example usage
-def create_example_server():
-    server = MCPServer("example-server", "1.0.0")
+def create_simplified_kimi_server():
+    """创建简化的 Kimi AI MCP 服务器"""
+    server = SimplifiedKimiMCPServer("kimi-mcp-demo", "1.0.0")
     
-    @server.tool("calculate", "Perform mathematical calculations", {
+    @server.tool("kimi_chat", "与 Kimi AI 模型对话 (演示版)", {
         "type": "object",
         "properties": {
-            "expression": {"type": "string", "description": "Mathematical expression to evaluate"}
-        },
-        "required": ["expression"]
-    })
-    def calculate(expression: str):
-        try:
-            result = eval(expression)
-            return f"Result: {result}"
-        except Exception as e:
-            return f"Error: {str(e)}"
-            
-    @server.tool("streaming_count", "Count with streaming output")
-    async def streaming_count(max_count: int = 5):
-        for i in range(max_count):
-            yield f"Count: {i + 1}"
-            await asyncio.sleep(0.5)
-    
-    @server.tool("chat_stream", "Simulate streaming chat response", {
-        "type": "object",
-        "properties": {
-            "message": {"type": "string", "description": "User message to respond to"},
-            "response_type": {"type": "string", "description": "Type of response: 'helpful', 'creative', 'technical'", "default": "helpful"}
+            "message": {"type": "string", "description": "用户消息"},
+            "model": {"type": "string", "description": "模型名称", "default": "kimi-k2-turbo-preview"},
+            "temperature": {"type": "number", "description": "温度参数", "default": 0.7},
+            "max_tokens": {"type": "integer", "description": "最大token数", "default": 2000}
         },
         "required": ["message"]
     })
-    async def chat_stream(message: str, response_type: str = "helpful"):
-        """Simulate a streaming chat response"""
+    async def kimi_chat(message: str, model: str = "kimi-k2-turbo-preview", temperature: float = 0.7, max_tokens: int = 2000):
+        """与 Kimi AI 模型对话（演示版流式响应）"""
         
-        # Predefined responses based on type
-        responses = {
-            "helpful": [
-                f"I understand you're asking about: {message[:50]}...",
-                "Let me think about this step by step.",
-                "Here's what I can help you with:",
-                "1. First, I'll analyze your question",
-                "2. Then I'll provide a detailed explanation", 
-                "3. Finally, I'll give you actionable next steps",
-                f"Based on your message about '{message[:30]}...', here's my response:",
-                "I hope this helps! Feel free to ask follow-up questions."
-            ],
-            "creative": [
-                f"What an interesting question about: {message[:40]}...",
-                "Let me paint you a picture with words...",
-                "Imagine if we could approach this creatively:",
-                "Here's a fresh perspective:",
-                "Creative solution #1: Think outside the box",
-                "Creative solution #2: Combine unexpected elements", 
-                "Creative solution #3: Challenge assumptions",
-                "That's my creative take! What sparks your imagination?"
-            ],
-            "technical": [
-                f"Technical analysis of: {message[:40]}...",
-                "Let me break down the technical aspects:",
-                "Architecture considerations:",
-                "Implementation details:",
-                "Performance implications:",
-                "Code examples and best practices:",
-                "Tools and frameworks to consider:",
-                "Technical recommendations complete!"
+        # 根据模型类型生成不同风格的响应
+        if model == "ultrathink":
+            responses = [
+                f"[UltraThink 深度分析] 正在分析您的问题: {message[:50]}...",
+                "让我深入思考这个问题的各个层面...",
+                "",
+                "第一层思考: 问题的本质是什么？",
+                f"您提出的问题涉及到: {message[:100]}",
+                "",
+                "第二层思考: 相关的概念和理论框架",
+                "我需要考虑多个角度来全面回答这个问题。",
+                "",
+                "第三层思考: 实际应用和深层含义",
+                "基于深度分析，我认为这个问题的核心在于...",
+                "",
+                "综合结论:",
+                f"针对您关于'{message[:30]}...'的问题，经过深度思考，我的观点是...",
+                "",
+                "这是一个需要多维度思考的复杂问题，希望我的深度分析对您有帮助。"
             ]
-        }
+        else:  # kimi-k2-turbo-preview
+            responses = [
+                f"[Kimi K2 Turbo] 收到您的消息: {message[:50]}...",
+                "正在快速处理您的请求...",
+                "",
+                f"关于您提到的'{message[:40]}'，我来为您详细解答:",
+                "",
+                "首先，让我理解一下您的需求...",
+                f"基于您的问题，我认为关键点在于: {message[:60]}",
+                "",
+                "让我为您提供一个清晰的回答:",
+                "1. 这个问题涉及到的核心概念",
+                "2. 相关的背景知识和应用场景", 
+                "3. 实用的建议和解决方案",
+                "",
+                f"总结来说，对于'{message[:30]}...'这个问题，我的建议是...",
+                "",
+                "希望这个回答对您有帮助！如果您还有其他问题，随时可以继续提问。"
+            ]
         
-        selected_responses = responses.get(response_type, responses["helpful"])
-        
-        for i, chunk in enumerate(selected_responses):
-            yield chunk
-            # Simulate realistic typing delay
-            await asyncio.sleep(0.3 + (len(chunk) * 0.01))
-            
-    @server.tool("chat_history", "Get simulated chat history")
-    async def chat_history():
-        """Return a simulated chat history for demo purposes"""
-        history = [
-            {"role": "user", "content": "Hello! How are you today?", "timestamp": "2024-01-15 10:00:00"},
-            {"role": "assistant", "content": "Hello! I'm doing great, thank you for asking! How can I help you today?", "timestamp": "2024-01-15 10:00:05"},
-            {"role": "user", "content": "Can you help me understand MCP streaming?", "timestamp": "2024-01-15 10:01:00"},
-            {"role": "assistant", "content": "Absolutely! MCP streaming allows real-time data flow between servers and clients...", "timestamp": "2024-01-15 10:01:10"}
+        # 模拟流式输出
+        for i, response_part in enumerate(responses):
+            yield response_part
+            # 根据内容长度调整延迟时间
+            if response_part:
+                delay = 0.2 + len(response_part) * 0.01
+                await asyncio.sleep(min(delay, 1.0))  # 最大延迟1秒
+            else:
+                await asyncio.sleep(0.1)  # 空行短暂延迟
+    
+    @server.tool("kimi_models", "获取可用的 Kimi 模型列表")
+    def get_kimi_models():
+        """获取可用的 Kimi AI 模型（演示版）"""
+        models = [
+            {
+                "name": "kimi-k2-turbo-preview",
+                "description": "Kimi K2 Turbo 预览版 - 快速响应的对话模型，适合日常对话和快速问答",
+                "max_tokens": 4096,
+                "features": ["快速响应", "多轮对话", "知识问答"],
+                "use_cases": ["日常聊天", "信息查询", "简单任务"]
+            },
+            {
+                "name": "ultrathink",
+                "description": "UltraThink - 深度思考模型，适合复杂推理任务和深度分析",
+                "max_tokens": 8192,
+                "features": ["深度推理", "逻辑分析", "复杂问题解决"],
+                "use_cases": ["学术研究", "复杂分析", "创新思考"]
+            }
         ]
-        
-        for message in history:
-            yield f"[{message['timestamp']}] {message['role']}: {message['content']}"
-            await asyncio.sleep(0.2)
-            
-    @server.resource("config://settings", "settings", "application/json", "Server configuration")
-    def get_settings():
+        return json.dumps(models, ensure_ascii=False, indent=2)
+    
+    @server.resource("config://kimi-demo-settings", "kimi_demo_settings", "application/json", "Kimi AI 演示配置")
+    def get_kimi_demo_settings():
+        """获取 Kimi AI 演示配置信息"""
         return {
-            "name": server.name,
-            "version": server.version,
-            "capabilities": ["tools", "resources", "prompts", "streaming"]
+            "mode": "demo" if server.demo_mode else "production",
+            "api_configured": not server.demo_mode,
+            "available_models": ["kimi-k2-turbo-preview", "ultrathink"],
+            "features": ["streaming", "chat_completion", "model_selection"],
+            "demo_note": "当前为演示模式，使用模拟响应。设置 KIMI_API_KEY 环境变量可切换到真实模式。"
         }
         
-    @server.prompt("greeting", "Generate a greeting message")
-    def greeting_prompt(name: str = "User"):
+    @server.prompt("kimi_conversation_starter", "Kimi AI 对话开始提示", [
+        {"name": "topic", "description": "对话主题", "required": False},
+        {"name": "style", "description": "对话风格", "required": False}
+    ])
+    def kimi_conversation_starter(topic: str = "AI技术", style: str = "友好专业"):
+        """生成 Kimi AI 对话开始提示"""
         return {
-            "role": "user",
-            "content": f"Generate a friendly greeting for {name}"
+            "role": "system",
+            "content": f"你是 Kimi AI，一个{style}的人工智能助手。现在我们要讨论关于{topic}的话题。请用温暖、专业且富有洞察力的方式与用户交流。"
         }
         
     return server
 
 
-async def run_example_server():
-    server = create_example_server()
+async def run_simplified_kimi_server():
+    """运行简化的 Kimi MCP 服务器"""
+    print("Creating Kimi MCP server...")
+    server = create_simplified_kimi_server()
+    print("Server created, starting on port 3002...")
     
     try:
-        # Start TCP server on port 3001
-        await server.start_tcp(port=3001)
+        await server.start_tcp(port=3002)
     except KeyboardInterrupt:
-        print("Server stopped")
+        print("Server stopped by user")
+    except Exception as e:
+        print(f"Server error: {e}")
     finally:
         await server.stop()
 
 
 if __name__ == "__main__":
-    asyncio.run(run_example_server())
+    import sys
+    print("Kimi MCP Server (Simplified Demo) starting...")
+    sys.stdout.flush()
+    api_key = os.getenv('KIMI_API_KEY')
+    if api_key:
+        print(f"[OK] Detected Kimi API Key")
+        sys.stdout.flush()
+    else:
+        print("[DEMO] Demo mode: No KIMI_API_KEY found, using mock responses")
+        print("[TIP] To use real API, set: export KIMI_API_KEY=your_key")
+        sys.stdout.flush()
+    
+    asyncio.run(run_simplified_kimi_server())

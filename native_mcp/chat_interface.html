@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 流式聊天界面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .connection-status {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected {
+            background-color: #28a745;
+        }
+
+        .status-disconnected {
+            background-color: #dc3545;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            border: 1px solid #e9ecef;
+            color: #333;
+        }
+
+        .message.system .message-content {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            font-style: italic;
+        }
+
+        .message-timestamp {
+            font-size: 0.75em;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .typing-dots {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 18px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+        }
+
+        .typing-dots span {
+            height: 8px;
+            width: 8px;
+            background: #6c757d;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .chat-input-container {
+            background: white;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .chat-input {
+            flex: 1;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            padding: 12px 16px;
+            font-size: 1em;
+            outline: none;
+            resize: none;
+            max-height: 100px;
+            min-height: 44px;
+            transition: border-color 0.3s;
+        }
+
+        .chat-input:focus {
+            border-color: #4facfe;
+        }
+
+        .response-type-select {
+            border: 2px solid #e9ecef;
+            border-radius: 20px;
+            padding: 8px 12px;
+            font-size: 0.9em;
+            outline: none;
+            background: white;
+            cursor: pointer;
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: scale(1.05);
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .demo-buttons {
+            padding: 10px 20px;
+            background: #e9ecef;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .demo-button {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 15px;
+            padding: 5px 12px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .demo-button:hover {
+            background: #f8f9fa;
+            border-color: #4facfe;
+        }
+
+        .connect-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 5px 15px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .connect-button:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            MCP 流式聊天演示
+        </div>
+        
+        <div class="connection-status">
+            <div>
+                <span class="status-indicator status-disconnected" id="statusIndicator"></span>
+                <span id="connectionStatus">未连接</span>
+            </div>
+            <button class="connect-button" id="connectButton" onclick="connectToMCP()">连接 MCP</button>
+        </div>
+
+        <div class="demo-buttons">
+            <button class="demo-button" onclick="loadChatHistory()">📜 加载聊天历史</button>
+            <button class="demo-button" onclick="sendDemoMessage('helpful')">💡 发送帮助询问</button>
+            <button class="demo-button" onclick="sendDemoMessage('creative')">🎨 发送创意询问</button>
+            <button class="demo-button" onclick="sendDemoMessage('technical')">🔧 发送技术询问</button>
+            <button class="demo-button" onclick="clearChat()">🗑️ 清空聊天</button>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="message system">
+                <div class="message-content">
+                    欢迎使用 MCP 流式聊天演示！点击"连接 MCP"开始体验实时流式对话。
+                </div>
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typingIndicator">
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+                正在输入...
+            </div>
+        </div>
+        
+        <div class="chat-input-container">
+            <select class="response-type-select" id="responseType">
+                <option value="helpful">💡 帮助性回复</option>
+                <option value="creative">🎨 创意性回复</option>
+                <option value="technical">🔧 技术性回复</option>
+            </select>
+            <textarea 
+                class="chat-input" 
+                id="chatInput" 
+                placeholder="输入你的消息..."
+                onkeydown="handleInputKeydown(event)"
+            ></textarea>
+            <button class="send-button" id="sendButton" onclick="sendMessage()" disabled>
+                ➤
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let isConnected = false;
+        let websocket = null;
+        let currentAssistantMessage = null;
+
+        // WebSocket 连接
+        function connectWebSocket() {
+            return new Promise((resolve, reject) => {
+                try {
+                    websocket = new WebSocket('ws://localhost:8080/ws');
+                    
+                    websocket.onopen = () => {
+                        console.log('WebSocket connected');
+                        resolve(true);
+                    };
+                    
+                    websocket.onmessage = (event) => {
+                        handleWebSocketMessage(JSON.parse(event.data));
+                    };
+                    
+                    websocket.onclose = () => {
+                        console.log('WebSocket disconnected');
+                        isConnected = false;
+                        updateConnectionStatus(false);
+                    };
+                    
+                    websocket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        reject(error);
+                    };
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        function handleWebSocketMessage(data) {
+            const { type } = data;
+            
+            switch (type) {
+                case 'connection_status':
+                    isConnected = data.connected;
+                    updateConnectionStatus(data.connected);
+                    if (data.connected) {
+                        addSystemMessage('✅ 成功连接到 MCP 服务器！');
+                    } else {
+                        addSystemMessage('❌ 连接 MCP 服务器失败');
+                    }
+                    break;
+                    
+                case 'typing_start':
+                    showTypingIndicator();
+                    break;
+                    
+                case 'typing_end':
+                    hideTypingIndicator();
+                    break;
+                    
+                case 'message_start':
+                    currentAssistantMessage = addMessage('assistant', '');
+                    break;
+                    
+                case 'message_chunk':
+                    if (currentAssistantMessage) {
+                        currentAssistantMessage.textContent += data.content + ' ';
+                        document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+                    }
+                    break;
+                    
+                case 'message_end':
+                    currentAssistantMessage = null;
+                    break;
+                    
+                case 'history_start':
+                    addSystemMessage('📜 正在加载聊天历史...');
+                    break;
+                    
+                case 'history_chunk':
+                    addSystemMessage(data.content);
+                    break;
+                    
+                case 'history_end':
+                    addSystemMessage('✅ 聊天历史加载完成');
+                    break;
+                    
+                case 'error':
+                    addSystemMessage(`❌ 错误: ${data.message}`);
+                    hideTypingIndicator();
+                    break;
+                    
+                case 'pong':
+                    console.log('Pong received');
+                    break;
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const connectionStatus = document.getElementById('connectionStatus');
+            const connectButton = document.getElementById('connectButton');
+            const sendButton = document.getElementById('sendButton');
+
+            if (connected) {
+                statusIndicator.className = 'status-indicator status-connected';
+                connectionStatus.textContent = '已连接 MCP 服务器';
+                connectButton.textContent = '已连接';
+                connectButton.disabled = true;
+                sendButton.disabled = false;
+            } else {
+                statusIndicator.className = 'status-indicator status-disconnected';
+                connectionStatus.textContent = '未连接';
+                connectButton.textContent = '连接 MCP';
+                connectButton.disabled = false;
+                sendButton.disabled = true;
+            }
+        }
+
+        async function connectToMCP() {
+            const connectButton = document.getElementById('connectButton');
+            const connectionStatus = document.getElementById('connectionStatus');
+
+            connectButton.textContent = '连接中...';
+            connectButton.disabled = true;
+            connectionStatus.textContent = '连接中...';
+
+            try {
+                if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                    await connectWebSocket();
+                }
+                
+                // 发送连接请求
+                websocket.send(JSON.stringify({ type: 'connect' }));
+                
+            } catch (error) {
+                console.error('Connection failed:', error);
+                updateConnectionStatus(false);
+                addSystemMessage('❌ 连接失败，请检查服务器是否运行');
+            }
+        }
+
+        function addMessage(role, content) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            const timestampDiv = document.createElement('div');
+            timestampDiv.className = 'message-timestamp';
+            timestampDiv.textContent = new Date().toLocaleTimeString();
+            
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timestampDiv);
+            chatMessages.appendChild(messageDiv);
+            
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            return contentDiv;
+        }
+
+        function addSystemMessage(content) {
+            addMessage('system', content);
+        }
+
+        function showTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'flex';
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        async function sendMessage() {
+            if (!isConnected || !websocket || websocket.readyState !== WebSocket.OPEN) {
+                addSystemMessage('请先连接到 MCP 服务器');
+                return;
+            }
+
+            const chatInput = document.getElementById('chatInput');
+            const responseType = document.getElementById('responseType').value;
+            const message = chatInput.value.trim();
+
+            if (!message) return;
+
+            // 添加用户消息
+            addMessage('user', message);
+            chatInput.value = '';
+
+            // 发送消息到服务器
+            websocket.send(JSON.stringify({
+                type: 'chat_message',
+                message: message,
+                response_type: responseType
+            }));
+        }
+
+        async function loadChatHistory() {
+            if (!isConnected || !websocket || websocket.readyState !== WebSocket.OPEN) {
+                addSystemMessage('请先连接到 MCP 服务器');
+                return;
+            }
+
+            websocket.send(JSON.stringify({ type: 'load_history' }));
+        }
+
+        function sendDemoMessage(type) {
+            const demoMessages = {
+                helpful: "你能帮我理解什么是机器学习吗？",
+                creative: "如何创造性地解决团队协作问题？", 
+                technical: "请解释一下 REST API 的设计原则"
+            };
+
+            const chatInput = document.getElementById('chatInput');
+            const responseTypeSelect = document.getElementById('responseType');
+            
+            chatInput.value = demoMessages[type];
+            responseTypeSelect.value = type;
+            
+            sendMessage();
+        }
+
+        function clearChat() {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = `
+                <div class="message system">
+                    <div class="message-content">
+                        聊天记录已清空。继续新的对话吧！
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleInputKeydown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // 页面加载完成后自动连接
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                connectToMCP();
+            }, 500);
+        });
+
+        // 页面关闭时清理连接
+        window.addEventListener('beforeunload', () => {
+            if (websocket) {
+                websocket.close();
+            }
+        });
+    </script>
+</body>
+</html>
